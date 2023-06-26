@@ -1,0 +1,9 @@
+/figure/
+/log/
+/res/
+/tensorboard_log/
+**.pyc
+
+/model/__pycache__/
+/NSvisc_samplebase_compareUQ/__pycache__/
+/utils/__pycache__/
