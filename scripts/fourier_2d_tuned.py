@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import matplotlib.pyplot as plt
-from utilities3 import *
+from utils.utilities3 import *
 
 import operator
 from functools import reduce

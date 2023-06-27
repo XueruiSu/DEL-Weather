@@ -8,11 +8,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from timeit import default_timer
-from utils.main_model_class import data_load, datadriven_model, physics_model
+from models.main_model_class import data_load, datadriven_model, physics_model
 import gc
 import pickle
 import datetime
-from utils.dual_enhance_class import dual_enhance
+from models.dual_enhance_class import dual_enhance
 from torch.utils.tensorboard import SummaryWriter   
 torch.manual_seed(0)
 np.random.seed(0)

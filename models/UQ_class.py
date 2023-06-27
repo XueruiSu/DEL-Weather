@@ -6,10 +6,10 @@ import matplotlib.pyplot as plt
 from utils.utilities3 import count_params, LpLoss
 from utils.scripts_calc_acc import Ranking_loss2, Ranking_loss_subnet
 from utils.buffer import ReplayMemory
-from model.FNO_2d import FNO2d_UQ_mean
-from model.UQ_sub_model import FNO2d_UQ_sample, FNO2d_UQ_sample_mainmodel, UQ_sample_mainmodel, FNO2d_UQ_NLL, FNO2d_UQ_Ensemble
-from utils.Adam import Adam     
-from utils.main_model_class import data_load
+from modules.FNO_2d import FNO2d_UQ_mean
+from modules.UQ_sub_model import FNO2d_UQ_sample, FNO2d_UQ_sample_mainmodel, UQ_sample_mainmodel, FNO2d_UQ_NLL, FNO2d_UQ_Ensemble
+from optim.Adam import Adam     
+from models.main_model_class import data_load
 
 class UQ_model():
     def __init__(self, modelConfig):

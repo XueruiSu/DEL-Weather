@@ -2,8 +2,11 @@
 /log/
 /res/
 /tensorboard_log/
-**.pyc
+/era5seqrecord/
+/ScaleModel/
 
+**.pyc
+/ScaleModel/
 /model/__pycache__/
 /NSvisc_samplebase_compareUQ/__pycache__/
 /utils/__pycache__/

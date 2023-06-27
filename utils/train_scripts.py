@@ -2,17 +2,17 @@
 @author: Xuerui Su
 This file is the scripts to assist training
 """
-
-
 import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-from model import FNO3d, FNO3d_UQ, FNO3d_UQ_Res, UNet_O
-from Adam import Adam
-
+from models.model_UNet import FNO3d, FNO3d_UQ, FNO3d_UQ_Res, UNet_O
+from optim.Adam import Adam
+from utils.utilities3 import count_params, LpLoss
+from buffer import ReplayMemory
 torch.manual_seed(0)
 np.random.seed(0)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def model_defination(modelConfig):
     modes = modelConfig['modes']

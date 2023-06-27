@@ -8,11 +8,10 @@ from functools import reduce
 from functools import partial
 from timeit import default_timer
 from utils.utilities3 import UnitGaussianNormalizer, count_params, LpLoss
-from utils.scripts_calc_acc import calc_acc, Ranking_loss2
 from utils.buffer import ReplayMemory
-from model.FNO_2d import FNO2d, FNO2d_Physics, FNO2d_UQ
-from model.UQ_sub_model import FNO2d_UQ_sample
-from utils.Adam import Adam
+from modules.FNO_2d import FNO2d, FNO2d_Physics, FNO2d_UQ
+from modules.UQ_sub_model import FNO2d_UQ_sample
+from optim.Adam import Adam
 from utils.NS_Solver_vorticity import solver_ns
 
 def load_data_from_file(modelConfig):
@@ -394,3 +393,6 @@ class physics_model():
         plt.show()
         plt.close()
         return test_mse_step, test_l2_step
+    
+    
+    

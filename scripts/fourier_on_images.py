@@ -15,7 +15,7 @@ from functools import reduce
 from functools import partial
 
 from timeit import default_timer
-from utilities3 import *
+from utils.utilities3 import *
 
 import torchvision
 import torchvision.transforms as transforms

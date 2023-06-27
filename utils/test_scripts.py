@@ -13,7 +13,7 @@ import operator
 from functools import reduce
 from functools import partial
 from timeit import default_timer
-from Adam import Adam
+from optim.Adam import Adam
 
 torch.manual_seed(0)
 np.random.seed(0)

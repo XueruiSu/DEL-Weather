@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-from model.FNO_2d import FNO2d_UQ_mean, FNO2d_UQ, FNO2d_UQ_single_layer
+from models.FNO_2d import FNO2d_UQ_mean, FNO2d_UQ, FNO2d_UQ_single_layer
 # from FNO_2d import FNO2d_UQ_mean, FNO2d_UQ
 torch.manual_seed(0)
 np.random.seed(0)
