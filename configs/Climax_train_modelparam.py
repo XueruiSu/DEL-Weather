@@ -1,7 +1,26 @@
-# dir
-default_root_dir = "/home/dual/DEL-Weather"
+# trainer 
+default_root_dir = "/blob/weather-blob/xueruisu/DEL-Weather"
 accelerator = "gpu"
+default_checkpoints_dir = "/blob/weather-blob/xueruisu/DEL-Weather/checkpoints"
+precision = 16
+max_epochs = 100
+# strategy = "ddp_find_unused_parameters_false"
+strategy = "ddp"
 devices = "auto"
+# devices = 8
+num_nodes = 1
+enable_checkpointing = True
+
+# callbacks
+dirpath = "${default_root_dir}/checkpoints"
+monitor_param = "val/w_rmse" # name of the logged metric which determines when model is improving
+mode = "min" # "max" means higher metric value is better, can be also "min"
+save_top_k = 1 # save k best models (determined by above metric)
+save_last = True # additionaly always save model from last epoch
+verbose = False
+filename = "epoch_{epoch}-{step}-{val_loss:.2f}"
+auto_insert_metric_name = False
+
 # model hyperpapremeters
 const_vars = [
 "land_sea_mask",
@@ -15,8 +34,8 @@ single_vars = [
 "mean_sea_level_pressure",
 "total_cloud_cover",
 "total_column_water_vapour",
-"toa_incident_solar_radiation",
-"total_precipitation",
+# "toa_incident_solar_radiation",
+# "total_precipitation",
 ]
 atmos_levels = [
     1,
@@ -63,7 +82,7 @@ atmos_vars = [
 "v_component_of_wind",
 "temperature",
 "specific_humidity",
-"relative_humidity",
+# "relative_humidity",
 ]
 # ForecastPretrain param
 restart_path=""
@@ -80,7 +99,8 @@ opt_name = "adamw"
 # dataloader hyperparemeters
 dict_root_dirs = {
 "train": {
-    "era5":"/mnt/data/era5/",
+    "era5":"/mnt/data/era5/1979/",
+    "era5":"/mnt/data/era5_second/1980/",
 },
 "val": {
     "era5":"/mnt/data/era5_valid/1982/",
@@ -90,7 +110,8 @@ dict_root_dirs = {
 }
 }
 dict_metadata_dirs = {
-    "era5":"/mnt/data/era5/",
+    "era5":"/mnt/data/era5/1979/",
+    "era5":"/mnt/data/era5_second/1980/",
 }
 dict_data_spatial_shapes = {"era5": [721, 1440],}
 dict_single_vars = {
@@ -298,7 +319,7 @@ dict_max_predict_range = {
 "era5": 1,
 }
 batch_size = 2
-shuffle_buffer_size = 10
+shuffle_buffer_size = 10000
 val_shuffle_buffer_size = 10
 num_workers = 2
 pin_memory = True

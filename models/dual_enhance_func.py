@@ -1,6 +1,6 @@
 import os
-from NSvisc_samplebase_compareUQ.train_test_framework import dual_enhance_sample_compare_UQ
-import torch
+from models.framework.train_test_framework import dual_enhance_sample_compare_UQ
+import torch 
 
 # main  
 def NSvisc_samplebase_compareUQ_train_test(modelConfig):

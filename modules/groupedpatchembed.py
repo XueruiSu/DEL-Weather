@@ -4,7 +4,8 @@ from typing import Iterable
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from timm.layers.helpers import to_2tuple
+# from timm.layers.helpers import to_2tuple
+from timm.models.layers.helpers import to_2tuple
 from timm.models.vision_transformer import trunc_normal_
 from einops import rearrange
 

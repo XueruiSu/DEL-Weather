@@ -4,7 +4,8 @@
 /tensorboard_log/
 /era5seqrecord/
 /ScaleModel/
-
+/lightning_logs/
+/checkpoints/
 **.pyc
 /ScaleModel/
 /model/__pycache__/

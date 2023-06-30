@@ -1,6 +1,6 @@
 import torch
 from utils.NS_Solver_vorticity import solver_ns        
-from utils.UQ_class import UQ_model
+from models.DualEnhance.UQ_class import UQ_model
 
 # dual enhance class 
 class dual_enhance():

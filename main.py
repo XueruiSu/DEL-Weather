@@ -9,7 +9,7 @@ import numpy as np
 import datetime
 import os
 import sys
-from dual_enhance_func import UQ_test
+from models.dual_enhance_func import UQ_test
 import sys
 sys.path.append("..")
 

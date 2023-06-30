@@ -1,4 +1,4 @@
-import glob
+import glob 
 import multiprocessing as mp
 import os
 import time
@@ -8,11 +8,14 @@ from typing import Dict, Optional
 from pytorch_lightning import Trainer  
 from data.seqrecord.module import MultiSourceDataModule
 from data.monitor import monitor
-from models.pretrain import ForecastPretrain
+from models.framework.pretrain import ForecastPretrain
 from pytorch_lightning.cli import LightningArgumentParser, LightningCLI
 from torch.utils.tensorboard import SummaryWriter
 from modules.climnet import ClimNet
-from Climax_train_modelparam import * # hyperparameters
+from configs.Climax_train_modelparam import * # hyperparameters
+from pytorch_lightning.loggers import TensorBoardLogger
+import torch
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 def monitoring_process(q: mp.Queue, root: Path, key_suffix: str) -> None:
     # Determine where to write the logs.
@@ -83,6 +86,7 @@ def main():
         drop_rate=0.1,
         use_flash_attn=True,
     )
+    torch.save(net.state_dict(), "/blob/weather-blob/DEL-Weather/checkpoints/model_weights_init_2.pth") 
     model_class = ForecastPretrain(net, restart_path, lr, beta_1, beta_2, weight_decay, warmup_steps, 
                                    warmup_start_lr=warmup_start_lr, eta_min=eta_min, opt_name=opt_name,)
     datamodule_class = MultiSourceDataModule(dict_root_dirs, dict_data_spatial_shapes, 
@@ -101,9 +105,7 @@ def main():
     #     # parser_kwargs={"parser_mode": "omegaconf", "error_handler": None},
     #     # parser_kwargs={"parser_mode": "yaml", "error_handler": None},
     # )
-    trainer = Trainer(accelerator=accelerator, devices=devices, max_epochs=10)   
-    print(type(model_class))
-    
+    # default logger used by trainer (if tensorboard is installed)
     os.makedirs(default_root_dir, exist_ok=True)
     prev_ckpts = glob.glob(os.path.join(default_root_dir, "checkpoints", "*.ckpt"))
     if len(prev_ckpts) > 0:
@@ -112,7 +114,21 @@ def main():
         )
     else:
         resume_from_checkpoint = None
-
+    checkpoint_callback = ModelCheckpoint(  
+        dirpath=dirpath,  # saving checkpoint dir  
+        filename=filename,  # checkpoints file name
+        save_top_k=save_top_k,  # save top k models
+        verbose=verbose,  # Only print news when save models
+        monitor=monitor_param,  # use which loss to judge model 
+        mode=mode,  # val_loss min is better  
+        save_last=mode,  # save the last model too
+    )  
+    logger = TensorBoardLogger(save_dir=default_checkpoints_dir, version=1, name="lightning_logs")
+    trainer = Trainer(accelerator=accelerator, devices=devices, max_epochs=max_epochs, 
+                      enable_checkpointing=enable_checkpointing, strategy=strategy, 
+                      logger=logger, precision=precision, num_nodes=num_nodes, callbacks=[checkpoint_callback])   
+    print(type(model_class))
+    
     # local debug mode will automatically disable the monitor.
     # if not cli.config.disable_monitor:
     #     with Monitor(Path(default_root_dir)):

@@ -13,8 +13,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from typing import Union
-from timm.layers.helpers import to_2tuple
-# from timm.models.layers.helpers import to_2tuple
+# from timm.layers.helpers import to_2tuple
+from timm.models.layers.helpers import to_2tuple
 
 
 def get_1d_pos_encode(

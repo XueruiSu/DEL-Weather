@@ -602,8 +602,16 @@ class WSeqRecord:
             WSR: an instance of record
         """
         # Determine file to load the state from.
+        # last_slash_index = recorddir.rfind('/') 
+        # print(recorddir)
+        # last_slash_index = recorddir[:last_slash_index].rfind('/') 
+        # print(recorddir[:last_slash_index])
+        if "1979" in recorddir:
+            rank = 0
+        elif "1980" in recorddir:
+            rank = 1            
         path = os.path.join(
-            recorddir,
+            recorddir, # if train_or == "train" else recorddir,
             "record_all.dict" if rank is None else f"record_{rank}.dict",
         )
 

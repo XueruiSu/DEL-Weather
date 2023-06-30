@@ -9,7 +9,7 @@ from utils.buffer import ReplayMemory
 from modules.FNO_2d import FNO2d_UQ_mean
 from modules.UQ_sub_model import FNO2d_UQ_sample, FNO2d_UQ_sample_mainmodel, UQ_sample_mainmodel, FNO2d_UQ_NLL, FNO2d_UQ_Ensemble
 from optim.Adam import Adam     
-from models.main_model_class import data_load
+from data.DualEnhanceDataLoad.modules import data_load
 
 class UQ_model():
     def __init__(self, modelConfig):

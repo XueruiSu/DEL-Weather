@@ -1,18 +1,18 @@
 """
 @author: Xuerui Su
 This file is the submain file to assist training and test
-"""
+""" 
 import torch
 import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 from timeit import default_timer
-from models.main_model_class import data_load, datadriven_model, physics_model
+from models.framework.main_model_class import data_load, datadriven_model, physics_model
 import gc
 import pickle
 import datetime
-from models.dual_enhance_class import dual_enhance
+from models.DualEnhance.dual_enhance_class import dual_enhance
 from torch.utils.tensorboard import SummaryWriter   
 torch.manual_seed(0)
 np.random.seed(0)
