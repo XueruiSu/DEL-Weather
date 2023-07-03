@@ -126,6 +126,7 @@ class ClimNet(nn.Module):
         atmos_inputs = torch.stack([atmos_inputs[k] for k in atmos_inputs.keys()], dim=2)
         x = self.encoder(single_inputs, atmos_inputs, lead_times, metadata)
         x = self.backbone(x)
+        print("backbone x:", x.shape)
         single_preds, atmos_preds = self.decoder(x, metadata)
 
         # TODO (Johannes): Tests for this part of the code.

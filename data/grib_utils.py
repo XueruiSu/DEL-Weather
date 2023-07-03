@@ -4,8 +4,7 @@ import xarray as xr
 import numpy as np
 
 from typing import Union, Dict, Optional
-from climai_global.data.variables import VariableMapType
-
+from data.variables import VariableMapType
 
 def read_grib_with_retry(
     grib_path: str, var_code: Optional[str] = None, to_numpy: bool = False, max_retries: int = 5

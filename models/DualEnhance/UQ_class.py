@@ -10,20 +10,20 @@ from modules.FNO_2d import FNO2d_UQ_mean
 from modules.UQ_sub_model import FNO2d_UQ_sample, FNO2d_UQ_sample_mainmodel, UQ_sample_mainmodel, FNO2d_UQ_NLL, FNO2d_UQ_Ensemble
 from optim.Adam import Adam     
 from data.DualEnhanceDataLoad.modules import data_load
+from configs.Climax_train_modelparam import * # hyperparameters
+from data.seqrecord.module import MultiSourceDataModule
 
 class UQ_model():
     def __init__(self, modelConfig):
         self.modelConfig = modelConfig
-        # load training and test data
-        # data_dict = {
-        # 'a_normalizer_cpu': a_normalizer_cpu,
-        # 'a_normalizer_cuda': a_normalizer_cuda,
-        # 'y_normalizer_cpu': y_normalizer_cpu,
-        # 'y_normalizer_cuda': y_normalizer_cuda,
-        # 'train_loader': train_loader, 
-        # 'test_loader': test_loader
-        # }
-        self.data_dict = data_load(modelConfig, model_kind='UQ_train')
+        self.datamodule_class = MultiSourceDataModule(dict_root_dirs, dict_data_spatial_shapes, 
+                                                dict_single_vars, dict_atmos_vars, dict_hrs_each_step, 
+                                                dict_max_predict_range, batch_size, dict_metadata_dirs, 
+                                                shuffle_buffer_size=shuffle_buffer_size, 
+                                                val_shuffle_buffer_size=val_shuffle_buffer_size, 
+                                                num_workers=num_workers,
+                                                pin_memory=pin_memory,
+                                                use_old_loader=use_old_loader)
         
         modes = modelConfig['modes_UQ']
         width = modelConfig['width_UQ']
@@ -33,16 +33,6 @@ class UQ_model():
         self.model_s = modelConfig['model_s']
         if self.model_s == 'FNO':
             self.model = FNO2d_UQ_mean(modes, modes, width, T_in=modelConfig['T_in'], T=modelConfig['T']).cuda()
-        if self.model_s == 'FNO_sample':
-            self.model = FNO2d_UQ_sample(modes, modes, width, modelConfig['S'], T_in=modelConfig['T_in'], T=modelConfig['T']).cuda()
-        if (self.model_s == 'FNO_sample_main') or (self.model_s == 'FNO_sample_RE'):
-            self.model = FNO2d_UQ_sample_mainmodel(modes, modes, width, modelConfig['S'], T_in=modelConfig['T_in']).cuda()
-        if (self.model_s == 'sample_main') or (self.model_s == 'sample_RE'):
-            self.model = UQ_sample_mainmodel(modes, modes, width, modelConfig['S'], T_in=modelConfig['T_in']).cuda()
-        if self.model_s == 'pixel_NLL':
-            self.model = FNO2d_UQ_NLL(modes, modes, width, T_in=modelConfig['T_in'], T=modelConfig['T']).cuda()
-        if self.model_s == 'Ensemble':
-            self.model = FNO2d_UQ_Ensemble(ensemble_num=5, T_in=modelConfig['T_in'], T=modelConfig['T']).cuda()
         print("confidence quantification model parameters number:", count_params(self.model))
         self.optimizer = Adam(self.model.parameters(), lr=learning_rate, weight_decay=8e-4)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=scheduler_step, gamma=scheduler_gamma)
@@ -171,23 +161,6 @@ class UQ_model():
             R_1_pre, R_2_pre = self.model(x)
             R_1_pre, R_2_pre = self.data_dict['y_normalizer_cuda'].decode(R_1_pre), self.data_dict['y_normalizer_cuda'].decode(R_2_pre)
             mixed_loss, mse, l2, rank_loss = self.loss_UQ_mean(R_1_pre, R_2_pre, R_1, R_2)
-        if self.model_s == 'FNO_sample':
-            R_1_pre, R_2_pre = self.model(x)
-            mixed_loss, mse, l2, rank_loss = self.loss_UQ_subnet(R_1_pre, R_2_pre, R_1, R_2)
-        if (self.model_s == 'FNO_sample_main') or (self.model_s == 'sample_main'):
-            R_1_pre, R_2_pre = self.model(ut0_n_UQ.cuda(), utn0_d_n_UQ.cuda(), utn0_p_n_UQ.cuda())
-            mixed_loss, mse, l2, rank_loss = self.loss_UQ_subnet(R_1_pre, R_2_pre, R_1, R_2)
-        if (self.model_s == 'FNO_sample_RE') or (self.model_s == 'sample_RE'):
-            R1_relative, R2_relative = self.decode_all_RE(utn0_d_n_UQ, utn0_p_n_UQ, utn0_n_UQ)
-            R_1_pre, R_2_pre = self.model(ut0_n_UQ.cuda(), utn0_d_n_UQ.cuda(), utn0_p_n_UQ.cuda())
-            mixed_loss, mse, l2, rank_loss = self.loss_UQ_subnet_RE(R_1_pre, R_2_pre, R1_relative, R2_relative)
-        if self.model_s == 'pixel_NLL':
-            R1_relative, R2_relative = self.decode_all_RE(utn0_d_n_UQ, utn0_p_n_UQ, utn0_n_UQ)
-            log_var_d, log_var_p = self.model(ut0_n_UQ.cuda(), utn0_d_n_UQ.cuda(), utn0_p_n_UQ.cuda())
-            mixed_loss, mse, l2, rank_loss = self.loss_UQ_NLL(log_var_d, log_var_p, utn0_d_n_UQ, utn0_p_n_UQ, utn0_n_UQ, R1_relative, R2_relative)
-        if self.model_s == 'Ensemble':
-            mean_d, mean_p, var_d,  var_p = self.model(ut0_n_UQ.cuda(), utn0_d_n_UQ.cuda(), utn0_p_n_UQ.cuda())
-            mixed_loss, mse, l2, rank_loss = self.Loss_Ensemble(mean_d, mean_p, utn0_n_UQ.cuda(), var_d, var_p, R_1, R_2)
         mixed_loss.backward()
         self.optimizer.step()
         return mse.item(), l2.item(), rank_loss.item()
@@ -217,23 +190,6 @@ class UQ_model():
             R_1_pre, R_2_pre = self.model(x)
             R_1_pre, R_2_pre = self.data_dict['y_normalizer_cuda'].decode(R_1_pre), self.data_dict['y_normalizer_cuda'].decode(R_2_pre)
             _, test_mse, test_l2, test_rank_loss = self.loss_UQ_mean(R_1_pre, R_2_pre, R_1, R_2)
-        if self.model_s == 'FNO_sample':
-            R_1_pre, R_2_pre = self.model(x)
-            _, test_mse, test_l2, test_rank_loss = self.loss_UQ_subnet(R_1_pre, R_2_pre, R_1, R_2)
-        if (self.model_s == 'FNO_sample_main') or (self.model_s == 'sample_main'):
-            R_1_pre, R_2_pre = self.model(ut0_n_UQ.cuda(), utn0_d_n_UQ.cuda(), utn0_p_n_UQ.cuda())
-            _, test_mse, test_l2, test_rank_loss = self.loss_UQ_subnet(R_1_pre, R_2_pre, R_1, R_2)
-        if (self.model_s == 'FNO_sample_RE') or (self.model_s == 'sample_RE'):
-            R1_relative, R2_relative = self.decode_all_RE(utn0_d_n_UQ, utn0_p_n_UQ, utn0_n_UQ)
-            R_1_pre, R_2_pre = self.model(ut0_n_UQ.cuda(), utn0_d_n_UQ.cuda(), utn0_p_n_UQ.cuda())
-            _, test_mse, test_l2, test_rank_loss = self.loss_UQ_subnet_RE(R_1_pre, R_2_pre, R1_relative, R2_relative)
-        if self.model_s == 'pixel_NLL':
-            R1_relative, R2_relative = self.decode_all_RE(utn0_d_n_UQ, utn0_p_n_UQ, utn0_n_UQ)
-            log_var_d, log_var_p = self.model(ut0_n_UQ.cuda(), utn0_d_n_UQ.cuda(), utn0_p_n_UQ.cuda())
-            _, test_mse, test_l2, test_rank_loss = self.loss_UQ_NLL(log_var_d, log_var_p, utn0_d_n_UQ, utn0_p_n_UQ, utn0_n_UQ, R1_relative, R2_relative)
-        if self.model_s == 'Ensemble':
-            mean_d, mean_p, var_d,  var_p = self.model(ut0_n_UQ.cuda(), utn0_d_n_UQ.cuda(), utn0_p_n_UQ.cuda())
-            _, test_mse, test_l2, test_rank_loss = self.Loss_Ensemble(mean_d, mean_p, utn0_n_UQ.cuda(), var_d, var_p, R_1, R_2)
         return test_mse.item(), test_l2.item(), test_rank_loss.item()
     
     def test(self, dd_model, p_model):
@@ -338,23 +294,6 @@ class UQ_model():
             for _ in range(3):
                 R_1_pre = torch.mean(R_1_pre, dim=-1)
                 R_2_pre = torch.mean(R_2_pre, dim=-1)
-        if self.model_s == 'FNO_sample':
-            R_1_pre, R_2_pre = self.model(x_adv_UQ_dp)
-        if (self.model_s == 'FNO_sample_main') or (self.model_s == 'sample_main'):
-            R_1_pre, R_2_pre = self.model(x.cuda(), out_d.cuda(), out_p.cuda())
-        if (self.model_s == 'FNO_sample_RE') or (self.model_s == 'sample_RE'):
-            R_1_pre, R_2_pre = self.model(x.cuda(), out_d.cuda(), out_p.cuda())
-        if self.model_s == 'pixel_NLL':
-            log_var_d, log_var_p = self.model(x.cuda(), out_d.cuda(), out_p.cuda())
-            var_d, var_p = torch.exp(log_var_d), torch.exp(log_var_p)
-            for _ in range(3):
-                var_d, var_p = torch.mean(var_d, dim=-1), torch.mean(var_p, dim=-1)
-            R_1_pre, R_2_pre = var_d, var_p
-        if self.model_s == 'Ensemble':
-            _, _, var_d,  var_p = self.model(x.cuda(), out_d.cuda(), out_p.cuda())
-            for _ in range(3):
-                var_d, var_p = torch.mean(var_d, dim=-1), torch.mean(var_p, dim=-1)
-            R_1_pre, R_2_pre = var_d, var_p
         out_UQ_dp = torch.zeros_like(R_1_pre)
         Judge_R_1 = R_1_pre - self.modelConfig['dual_judge']*R_2_pre
         Judge_R_2 = self.modelConfig['dual_judge']*R_1_pre - R_2_pre

@@ -15,7 +15,7 @@ optim: optimizer used in training
 
 configs: trainer, data and model hyperparameters
 
-you may creater the below directory if they do not exist
+### you may creater the below directory if they do not exist
 
 checkpoints: model save directory
 
