@@ -3,7 +3,8 @@ import torch
 from configs.Climax_train_modelparam import * # hyperparameters
 from data import Metadata
 from utils.metrics import lat_weighted_mse
-from modules.climnet import ClimNet
+from modules.climnet import ClimNet_UQ
+import torch.nn.functional as F
 
 # TODO(Johannes): put tests on GPU
 @pytest.mark.parametrize(
@@ -18,20 +19,32 @@ from modules.climnet import ClimNet
 def test_climnet_forward(grid_size):
     """Test forward pass of the ClimNet module with era5 variables and pressure levels."""
     bs = 2
-    model = ClimNet(
+    model = ClimNet_UQ(
         const_vars=tuple(const_vars),
         single_vars=tuple(single_vars),
         atmos_vars=tuple(atmos_vars),
         atmos_levels=tuple(atmos_levels),
-        patch_size=16,
-        embed_dim=768,
-        depth=12,
-        decoder_depth=2,
-        num_heads=12,
-        mlp_ratio=4,
-        drop_path=0.1,
-        drop_rate=0.1,
-        use_flash_attn=True,
+        patch_size=patch_size,
+        embed_dim=embed_dim,
+        depth=depth,
+        decoder_depth=decoder_depth,
+        num_heads=num_heads,
+        mlp_ratio=mlp_ratio,
+        drop_path=drop_path,
+        drop_rate=drop_rate,
+        use_flash_attn=use_flash_attn,
+        
+        embed_dim_UQ=embed_dim_UQ,
+        out_embed_dim_UQ=out_embed_dim_UQ,
+        depth_UQ=depth_UQ,
+        en_UQ_embed_dim=en_UQ_embed_dim,
+        num_heads_UQ_en=num_heads_UQ_en,
+        num_heads_UQ_down=num_heads_UQ_down,
+        mlp_ratio_UQ=mlp_ratio_UQ,
+        drop_path_UQ=drop_path_UQ,
+        drop_rate_UQ=drop_rate_UQ,
+        use_flash_attn_UQ=use_flash_attn_UQ,
+        decoder_depth_down_UQ=decoder_depth_down_UQ,
     )
     single_inputs = torch.randn(bs, 1, len(single_vars), *grid_size)
     single_outputs = torch.randn(bs, len(single_vars), *grid_size)
@@ -50,21 +63,20 @@ def test_climnet_forward(grid_size):
         torch.rand(grid_size[1]).sort()[0] * 1440,
     )
 
-    _, single_out, atmos_out = model(single_inputs, atmos_inputs, lead_times, metadata)
-    assert single_out.shape == single_outputs.shape
+    R2Loss_target = torch.randn(bs, len(atmos_vars)*len(atmos_levels)+len(single_vars))
+    
+    _, R2Loss_pre = model(single_inputs, atmos_inputs, lead_times, metadata, single_outputs, atmos_outputs)
+    assert R2Loss_pre.shape == R2Loss_target.shape
 
-    assert atmos_outputs.keys() == atmos_out.keys()
-    for var in atmos_outputs.keys():
-        assert atmos_outputs[var].shape == atmos_out[var].shape
-
-    loss_dict, single_out, atmos_out = model(
+    loss_dict, R2Loss_pre = model(
         single_inputs,
         atmos_inputs,
         lead_times,
         metadata,
         single_outputs,
         atmos_outputs,
-        metric=[lat_weighted_mse],
+        R2Loss_target,
+        metric=[F.mse_loss],
     )
     print("single_inputs", single_inputs.shape)
     for k in atmos_inputs:
@@ -75,7 +87,7 @@ def test_climnet_forward(grid_size):
     print("lead_times", lead_times.shape)
     print("metadata lat", metadata.lat.shape)
     print("metadata lon", metadata.lon.shape)
-    
+    print("loss_dict", loss_dict)
     assert len(loss_dict) == 1
     
     

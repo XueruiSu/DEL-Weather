@@ -79,15 +79,15 @@ class datadriven_model_weather():
             single_vars=tuple(single_vars),
             atmos_vars=tuple(atmos_vars),
             atmos_levels=tuple(atmos_levels),
-            patch_size=16,
-            embed_dim=768,
-            depth=12,
-            decoder_depth=2,
-            num_heads=12,
-            mlp_ratio=4,
-            drop_path=0.1,
-            drop_rate=0.1,
-            use_flash_attn=True,
+            patch_size=patch_size,
+            embed_dim=embed_dim,
+            depth=depth,
+            decoder_depth=decoder_depth,
+            num_heads=num_heads,
+            mlp_ratio=mlp_ratio,
+            drop_path=drop_path,
+            drop_rate=drop_rate,
+            use_flash_attn=use_flash_attn,
         )
         self.model = torch.load(os.path.join(default_checkpoints_dir, model_name))
         self.model_class = ForecastPretrain(self.model, restart_path, lr, beta_1, beta_2, weight_decay, warmup_steps, 
@@ -144,7 +144,7 @@ def main():
         drop_rate=0.1,
         use_flash_attn=True,
     )
-    torch.save(net.state_dict(), "/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/checkpoints/model_weights_init_2.pth") 
+    # torch.save(net.state_dict(), "/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/checkpoints/model_weights_init_2.pth") 
     model_class = ForecastPretrain(net, restart_path, lr, beta_1, beta_2, weight_decay, warmup_steps, 
                                    warmup_start_lr=warmup_start_lr, eta_min=eta_min, opt_name=opt_name,)
     datamodule_class = MultiSourceDataModule(dict_root_dirs, dict_data_spatial_shapes, 

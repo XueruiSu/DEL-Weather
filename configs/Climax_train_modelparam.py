@@ -1,5 +1,5 @@
 # trainer 
-default_root_dir = "/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/checkpoints"
+default_root_dir = "/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather"
 accelerator = "gpu"
 default_checkpoints_dir = "/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/checkpoints"
 precision = 16
@@ -22,6 +22,28 @@ filename = "epoch_{epoch}-{step}-{val_loss:.2f}"
 auto_insert_metric_name = False
 
 # model hyperpapremeters
+patch_size=16
+embed_dim=768
+depth=12
+decoder_depth=2
+num_heads=12
+mlp_ratio=4
+drop_path=0.1
+drop_rate=0.1
+use_flash_attn=True
+
+embed_dim_UQ=768
+out_embed_dim_UQ = [256, 191]
+depth_UQ=1
+en_UQ_embed_dim = [256, 256]
+num_heads_UQ_en=1
+num_heads_UQ_down=4
+mlp_ratio_UQ=4
+drop_path_UQ=0.1
+drop_rate_UQ=0.1
+use_flash_attn_UQ=True
+decoder_depth_down_UQ = 3
+
 const_vars = [
     "land_sea_mask",
     "orography",
@@ -84,6 +106,8 @@ atmos_vars = [
     "specific_humidity",
     # "relative_humidity",
 ]
+
+
 # ForecastPretrain param
 restart_path=""
 lr = 5e-4
@@ -101,19 +125,25 @@ dict_root_dirs = {
     "train": {
         # "era5":"/mnt/data/era5/1979/",
         # "era5":"/mnt/data/era5_second/1980/",
-        "era5":"/blob/weathers2/xuerui/Dual-Weather/data/era5_second/1980/",
+        "era5":"/nfs/weather/era5/1979",
+        # "era5":"/nfs/weather/era5/1980",
+        # "era5":"/blob/weathers2/xuerui/Dual-Weather/data/era5/1979",
     },
     "val": {
-        "era5":"/mnt/data/era5_valid/1982/",
+        "era5":"/nfs/weather/era5_valid/1982/",
+        # "era5":"/blob/weathers2/xuerui/Dual-Weather/data/era5/1979/",
     },
     "test": {
-        "era5":"/mnt/data/era5_test/1981/",
+        "era5":"/nfs/weather/era5_test/1981/",
+        # "era5":"/blob/weathers2/xuerui/Dual-Weather/data/era5/1979/",
     }
 }
 dict_metadata_dirs = {
     # "era5":"/mnt/data/era5/1979/",
     # "era5":"/mnt/data/era5_second/1980/",
-    "era5":"/blob/weathers2/xuerui/Dual-Weather/data/era5_second/1980/",
+    "era5":"/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/data/era5_data_utils/era5_1979",
+    # "era5":"/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/data/era5_data_utils/era5_1980",
+    # "era5":"/blob/weathers2/xuerui/Dual-Weather/data/era5_second/1980/",
 }
 dict_data_spatial_shapes = {"era5": [721, 1440],}
 dict_single_vars = {
@@ -318,12 +348,12 @@ dict_hrs_each_step = {
     "era5": 1,  
 }
 dict_max_predict_range = {
-    "era5": 1,
+    "era5": 384,
 }
 batch_size = 2
 shuffle_buffer_size = 10000
 val_shuffle_buffer_size = 10
-num_workers = 2
+num_workers = 4
 pin_memory = True
 use_old_loader = False
 

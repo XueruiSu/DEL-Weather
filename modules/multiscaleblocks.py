@@ -323,7 +323,7 @@ class MultiScaleDecoder(nn.Module):
         self.all_var_map = create_var_map(self.all_vars)
 
         # prediction head
-        # TODO (Johannes): we probably want a normalization in the prediction head as well
+        # TODO (Johannes): we probably want a normalization in the pedriction head as well
         head = nn.ModuleList()
         for _ in range(decoder_depth):
             head.append(nn.Linear(embed_dim, embed_dim))

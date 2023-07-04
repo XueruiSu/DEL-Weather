@@ -23,6 +23,9 @@ print("net.encoder", count_params(net.encoder))
 print("net.backbone", count_params(net.backbone))
 print("net.decoder", count_params(net.decoder))
 # torch.save(net.state_dict(), "/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/checkpoints/model_weights_init_2.pth") 
-
+print("net.encoder", (net.encoder))
+print("net.backbone", (net.backbone))
+print("net.decoder", (net.decoder))
+# print(net)
 
 

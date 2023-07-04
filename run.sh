@@ -1,2 +1,2 @@
 export PYTHONPATH=.:$PYTHONPATH                                                     
-PATHONPATH=. python models/Climax_train.py 
+PATHONPATH=. python models/framework/Climai_train.py 
