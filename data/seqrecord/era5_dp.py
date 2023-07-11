@@ -3,7 +3,6 @@
 import numpy as np
 import torch
 import torchdata.datapipes as datapipe
-
 from torchdata.datapipes.iter import IterableWrapper
 from typing import Callable, Dict, List, Optional
 from data.seqrecord_utils.wseqrecord import WSeqRecord
@@ -102,6 +101,63 @@ def build_wdatapipe(
         dp = dp.prefetch(prefetch)
     dp = dp.separate_single_atmos_vars(
         single_vars, atmos_vars, lat, lon, hrs_each_step=hrs_each_step
+    )
+    for i, mapping in enumerate(mappings):
+        dp = dp.map(fn=mapping)
+    # Note that if you choose to use Batcher while setting batch_size > 1 for DataLoader,
+    # your samples will be batched more than once. You should choose one or the other.
+    # https://pytorch.org/data/main/tutorial.html#working-with-dataloader
+    dp = dp.batch(batch_size=batch_size, drop_last=True)
+    partial_collate_fn = partial(
+        collate_fn, single_transforms=single_transforms, atmos_transforms=atmos_transforms
+    )
+    dp = dp.collate(collate_fn=partial_collate_fn)
+    return dp
+
+
+
+def build_wdatapipe_UQ(
+    Main_Model_1: torch.nn.modules, 
+    Main_Model_2: torch.nn.modules, 
+    record: WSeqRecord,
+    file_shuffle_buffer_size: Optional[int],
+    single_vars: List[str],
+    atmos_vars: List[str],
+    lat: np.ndarray,
+    lon: np.ndarray,
+    hrs_each_step: int,
+    batch_size: int,
+    single_transforms: Optional[transforms.Normalize] = None,
+    atmos_transforms: Optional[transforms.Normalize] = None,
+    mappings: List[Callable] = [],
+    prefetch: int = 0,
+) -> datapipe.iter.IterDataPipe:
+    """Iteratively apply operations to datapipe: shuffle, sharding, map, batch, collator
+
+    Args:
+        datapipe (datapipe.datapipe.IterDataPipe): entry datapipe
+        shuffle_buffer_size (Optional[int]): buffer size for pseudo-shuffle
+        batch_size (int):
+        mappings (List[Callable]): a list of transforms applied to datapipe, between sharding and batch
+
+    Returns:
+        datapipe.datapipe.IterDataPipe: transformed datapipe ready to be sent to dataloader
+    """
+    # Avoid sending the record object through the pipe as it is very large and slows down the pipe.
+    dp = IterableWrapper(list(range(record.num_files))).gen_file_metadata(record=record)
+    # Shuffle will happen as long as you do NOT set `shuffle=False` later in the DataLoader
+    # https://pytorch.org/data/main/tutorial.html#working-with-dataloader
+    if file_shuffle_buffer_size is not None:
+        dp = dp.shuffle(buffer_size=file_shuffle_buffer_size)
+    # Sharding: Place ShardingFilter (datapipe.sharding_filter) as early as possible in the pipeline,
+    # especially before expensive operations such as decoding, in order to avoid repeating
+    # these expensive operations across worker/distributed processes.
+    dp = dp.sharding_filter()
+    dp = dp.gen_framepair(record=record)
+    if prefetch > 0:
+        dp = dp.prefetch(prefetch)
+    dp = dp.separate_single_atmos_vars_UQ(
+        single_vars, atmos_vars, lat, lon, hrs_each_step=hrs_each_step, Main_Model_1=Main_Model_1, Main_Model_2=Main_Model_2,
     )
     for i, mapping in enumerate(mappings):
         dp = dp.map(fn=mapping)

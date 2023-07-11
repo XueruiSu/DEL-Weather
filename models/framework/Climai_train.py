@@ -16,6 +16,10 @@ from configs.Climax_train_modelparam import * # hyperparameters
 from pytorch_lightning.loggers import TensorBoardLogger
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import LearningRateMonitor
+from pytorch_lightning.callbacks import RichModelSummary
+# 设置环境变量  
+# os.environ['JOBLIB_TEMP_FOLDER'] = '/tmp'  
 
 '''
 # def monitoring_process(q: mp.Queue, root: Path, key_suffix: str) -> None:
@@ -120,7 +124,9 @@ class datadriven_model_weather():
         logger = TensorBoardLogger(save_dir=default_checkpoints_dir, version=1, name="lightning_logs")
         self.trainer = Trainer(accelerator=accelerator, devices=devices, max_epochs=max_epochs, 
                         enable_checkpointing=enable_checkpointing, strategy=strategy, 
-                        logger=logger, precision=precision, num_nodes=num_nodes, callbacks=[checkpoint_callback])   
+                        logger=logger, precision=precision, num_nodes=num_nodes, callbacks=[checkpoint_callback], 
+                        limit_train_batches=limit_train_batches, limit_test_batches=limit_test_batches, 
+                        limit_val_batches=limit_val_batches)   
         print(type(self.model_class))
         
     def fit(self, ):
@@ -165,13 +171,14 @@ def main():
     # )
     # default logger used by trainer (if tensorboard is installed)
     os.makedirs(default_root_dir, exist_ok=True)
-    prev_ckpts = glob.glob(os.path.join(default_root_dir, "checkpoints", "*.ckpt"))
+    prev_ckpts = glob.glob(os.path.join(default_checkpoints_dir, "*.ckpt"))
     if len(prev_ckpts) > 0:
         resume_from_checkpoint = os.path.join(
-            default_root_dir, "checkpoints", "last.ckpt"
+            default_checkpoints_dir, "last.ckpt"
         )
     else:
         resume_from_checkpoint = None
+    lr_monitor = LearningRateMonitor(logging_interval=logging_interval)  # 或者 'epoch'，根据需要进行设置  
     checkpoint_callback = ModelCheckpoint(  
         dirpath=dirpath,  # saving checkpoint dir  
         filename=filename,  # checkpoints file name
@@ -180,11 +187,17 @@ def main():
         monitor=monitor_param,  # use which loss to judge model 
         mode=mode,  # val_loss min is better  
         save_last=mode,  # save the last model too
+        auto_insert_metric_name=auto_insert_metric_name,
     )  
+    richmodelsummary = RichModelSummary(max_depth=max_depth)
+    
     logger = TensorBoardLogger(save_dir=default_checkpoints_dir, version=1, name="lightning_logs")
     trainer = Trainer(accelerator=accelerator, devices=devices, max_epochs=max_epochs, 
                       enable_checkpointing=enable_checkpointing, strategy=strategy, 
-                      logger=logger, precision=precision, num_nodes=num_nodes, callbacks=[checkpoint_callback])   
+                      logger=logger, precision=precision, num_nodes=num_nodes, 
+                      callbacks=[checkpoint_callback, lr_monitor, richmodelsummary], 
+                      limit_train_batches=limit_train_batches, limit_test_batches=limit_test_batches, 
+                      limit_val_batches=limit_val_batches)      
     print(type(model_class))
     
     # local debug mode will automatically disable the monitor.

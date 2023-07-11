@@ -4,8 +4,12 @@
 /tensorboard_log/
 /era5seqrecord/
 /ScaleModel/
-/lightning_logs/
-/checkpoints/
+/lightning_logs/*
+/checkpoints/*
+/checkpoints_1979/*
+/checkpoints_1980/*
+/checkpoints_UQ/*
+/model_save/
 **.pyc
 /ScaleModel/
 /model/__pycache__/

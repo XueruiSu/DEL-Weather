@@ -238,7 +238,7 @@ class decoder_UQ(nn.Module):
         self,
         embed_dim_UQ: int = 768,
         out_embed_dim_UQ = [512, 191],
-        en_UQ_embed_dim = [384, 256],
+        en_UQ_embed_dim: int = 256,
         depth_UQ: int = 2,
         num_heads_UQ_down: int = 4,
         mlp_ratio_UQ: float = 48 / 11,
@@ -262,7 +262,7 @@ class decoder_UQ(nn.Module):
         )
         self.Down_sample_Vit2 = Down_sample_Vit(
             decoder_depth_down=decoder_depth_down_UQ,
-            embed_dim=out_embed_dim_UQ[0],
+            embed_dim=out_embed_dim_UQ[0]+2*en_UQ_embed_dim,
             out_embed_dim=out_embed_dim_UQ[1],
             depth=depth_UQ,
             num_heads=num_heads_UQ_down,
@@ -272,20 +272,23 @@ class decoder_UQ(nn.Module):
             use_flash_attn=use_flash_attn_UQ,
         )
         self.decoder = nn.Sequential(  
-            nn.Linear(4050, 1024),   
+            nn.Linear(int(720*1440/16/16), 1024),   
             nn.GELU(),  
             nn.Linear(1024, 256),  
             nn.GELU(),  
             nn.Linear(256, 1),   
         )  
-        self.En2Down_1 = nn.Linear(en_UQ_embed_dim[0], out_embed_dim_UQ[0])
-        self.En2Down_2 = nn.Linear(en_UQ_embed_dim[1], out_embed_dim_UQ[1])
+        # self.En2Down_1 = nn.Linear(en_UQ_embed_dim, out_embed_dim_UQ[0])
+        # self.En2Down_2 = nn.Linear(en_UQ_embed_dim, out_embed_dim_UQ[0])
         
     def forward(self, x, x1, x2):
-        # x: (B, 4050, 768), x1: (B, 4050, en_UQ_embed_dim[0]), x2: (B, 4050, en_UQ_embed_dim[1])
+        # 720*1440/16/16 = 4050
+        # x: (B, 4050, embed_dim_UQ), x1: (B, 4050, en_UQ_embed_dim), x2: (B, 4050, en_UQ_embed_dim)
         # self.Down_sample_Vit1(x): (B, 4050, out_embed_dim_UQ[0])
         # self.Down_sample_Vit2(x): (B, 4050, out_embed_dim_UQ[1])
-        x = self.Down_sample_Vit2(self.Down_sample_Vit1(x) + self.En2Down_1(x1)) + self.En2Down_2(x2) # (B, 4050, 191)
+        # x = torch.concat([self.Down_sample_Vit1(x), self.En2Down_1(x1), self.En2Down_2(x2)], dim=-1) # (B, 4050, out_embed_dim_UQ[0]+2*en_UQ_embed_dim)
+        x = torch.concat([self.Down_sample_Vit1(x), x1, x2], dim=-1) # (B, 4050, out_embed_dim_UQ[0]+2*en_UQ_embed_dim)
+        x = self.Down_sample_Vit2(x) # (B, 4050, 191)
         R2Loss_pre = self.decoder(x.permute(0, 2, 1)).squeeze()
         return R2Loss_pre
 
@@ -310,7 +313,7 @@ class ClimNet_UQ(nn.Module):
         embed_dim_UQ: int = 768,
         out_embed_dim_UQ = [512, 191],
         depth_UQ: int = 2,
-        en_UQ_embed_dim = [256, 256],
+        en_UQ_embed_dim: int = 256,
         num_heads_UQ_en: int = 2,
         num_heads_UQ_down: int = 4,
         mlp_ratio_UQ: float = 48 / 11,
@@ -347,7 +350,7 @@ class ClimNet_UQ(nn.Module):
             atmos_vars=atmos_vars,
             atmos_levels=atmos_levels,
             patch_size=patch_size,
-            embed_dim=en_UQ_embed_dim[0],
+            embed_dim=en_UQ_embed_dim,
             num_heads=num_heads_UQ_en,
             pressure_encode_dim=pressure_encode_dim,
             drop_rate=drop_rate,
@@ -357,7 +360,7 @@ class ClimNet_UQ(nn.Module):
             atmos_vars=atmos_vars,
             atmos_levels=atmos_levels,
             patch_size=patch_size,
-            embed_dim=en_UQ_embed_dim[1],
+            embed_dim=en_UQ_embed_dim,
             num_heads=num_heads_UQ_en,
             pressure_encode_dim=pressure_encode_dim,
             drop_rate=drop_rate,
@@ -394,13 +397,16 @@ class ClimNet_UQ(nn.Module):
         atmos_inputs: dict[str, torch.Tensor],
         lead_times: torch.Tensor,
         metadata: Metadata,
-        single_preds: torch.Tensor, 
-        atmos_preds: dict[str, torch.Tensor],
-        R2Loss_target: Optional[torch.Tensor] = None,
+        single_preds_1: torch.Tensor, 
+        atmos_preds_1: dict[str, torch.Tensor],
+        single_preds_2: torch.Tensor, 
+        atmos_preds_2: dict[str, torch.Tensor],
+        single_targets: Optional[torch.Tensor] = None,
+        atmos_targets: Optional[dict[str, torch.Tensor]] = None,
         metric=None,
     ) -> tuple[Optional[list], torch.Tensor]:
         
-        if R2Loss_target is None:
+        if (single_targets is None) and (atmos_targets is None):
             if metric is not None:
                 raise ValueError("metric must be None when no targets are provided")
         atmos_inputs = torch.stack([atmos_inputs[k] for k in atmos_inputs.keys()], dim=2)
@@ -408,22 +414,27 @@ class ClimNet_UQ(nn.Module):
         x = self.backbone(x) # (B, 4050, 768)
         
         # u_t+1_hat postprogress:
-        if single_preds.shape[1] != 1:
-            single_preds = single_preds.unsqueeze(1)
-        if atmos_preds[list(atmos_preds.keys())[0]].shape[1] != 1:
-            for k in atmos_preds.keys():
-                atmos_preds[k] = atmos_preds[k].unsqueeze(1)
-        atmos_preds = torch.stack([atmos_preds[k] for k in atmos_preds.keys()], dim=2)
-        x1 = self.encoder_hat1(single_preds, atmos_preds, lead_times, metadata) # (B, 4050, 256)
-        x2 = self.encoder_hat2(single_preds, atmos_preds, lead_times, metadata) # (B, 4050, 191)
+        if (single_preds_1.shape[1] != 1) and (single_preds_2.shape[1] != 1):
+            single_preds_1, single_preds_2 = single_preds_1.unsqueeze(1), single_preds_2.unsqueeze(1)
+        if (atmos_preds_1[list(atmos_preds_1.keys())[0]].shape[1] != 1) and (atmos_preds_2[list(atmos_preds_2.keys())[0]].shape[1] != 1):
+            for k in atmos_preds_1.keys():
+                atmos_preds_1[k], atmos_preds_2[k] = atmos_preds_1[k].unsqueeze(1), atmos_preds_2[k].unsqueeze(1)
+        atmos_preds_1 = torch.stack([atmos_preds_1[k] for k in atmos_preds_1.keys()], dim=2)
+        atmos_preds_2 = torch.stack([atmos_preds_2[k] for k in atmos_preds_2.keys()], dim=2)
+        x1 = self.encoder_hat1(single_preds_1, atmos_preds_1, lead_times, metadata) # (B, 4050, 191)
+        x2 = self.encoder_hat2(single_preds_2, atmos_preds_2, lead_times, metadata) # (B, 4050, 191)
         
         # UQ inference
         R2Loss_pre = self.decoder(x, x1, x2)
+        atmos_targets = torch.stack([atmos_targets[k] for k in atmos_targets.keys()], dim=2)
         
         if metric is None:
             loss = None
         else:
-            loss = [m(R2Loss_pre, R2Loss_target) for m in metric]
+            loss = [m(single_targets, atmos_targets, 
+                      single_preds_1, atmos_preds_1, 
+                      single_preds_2, atmos_preds_2, 
+                      metadata, R2Loss_pre) for m in metric]
 
         return loss, R2Loss_pre
 

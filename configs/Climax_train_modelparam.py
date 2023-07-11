@@ -1,7 +1,15 @@
 # trainer 
+# 改年份需要改两个地方：
+# 1.year变量（数据路径root_dirs和metadata_dirs都用year变量赋值）
+# 2.filename变量中的年份。
+# 每次train之前要确认default_root_dir是否是你的code的目录
+import os  
+
+year = "1980"
+os.makedirs(f"checkpoints_{year}", exist_ok=True)  
 default_root_dir = "/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather"
 accelerator = "gpu"
-default_checkpoints_dir = "/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/checkpoints"
+default_checkpoints_dir = default_root_dir + f"/checkpoints_{year}"
 precision = 16
 max_epochs = 100
 # strategy = "ddp_find_unused_parameters_false"
@@ -12,14 +20,24 @@ num_nodes = 1
 enable_checkpointing = True
 
 # callbacks
-dirpath = "${default_root_dir}/checkpoints"
-monitor_param = "val/w_rmse" # name of the logged metric which determines when model is improving
+# pytorch_lightning.callbacks.ModelCheckpoint
+dirpath = default_checkpoints_dir
+monitor_param = "val/loss" # name of the logged metric which determines when model is improving
 mode = "min" # "max" means higher metric value is better, can be also "min"
-save_top_k = 1 # save k best models (determined by above metric)
+save_top_k = 2 # save k best models (determined by above metric)
 save_last = True # additionaly always save model from last epoch
-verbose = False
-filename = "epoch_{epoch}-{step}-{val_loss:.2f}"
+verbose = False  
+filename = "epoch_1980_{epoch}-{step}-{val/loss:.2f}"
 auto_insert_metric_name = False
+# pytorch_lightning.callbacks.LearningRateMonitor
+logging_interval = "step"
+# pytorch_lightning.callbacks.RichModelSummary
+max_depth = -1
+
+# trainer batches:
+limit_train_batches = 1.0
+limit_val_batches = 160
+limit_test_batches = 160
 
 # model hyperpapremeters
 patch_size=16
@@ -35,7 +53,7 @@ use_flash_attn=True
 embed_dim_UQ=768
 out_embed_dim_UQ = [256, 191]
 depth_UQ=1
-en_UQ_embed_dim = [256, 256]
+en_UQ_embed_dim = 256
 num_heads_UQ_en=1
 num_heads_UQ_down=4
 mlp_ratio_UQ=4
@@ -43,6 +61,17 @@ drop_path_UQ=0.1
 drop_rate_UQ=0.1
 use_flash_attn_UQ=True
 decoder_depth_down_UQ = 3
+
+# checkpoints Main Model & UQ:
+Main_Model_Path_1 = default_root_dir + "/checkpoints_UQ/"
+Main_Model_Path_2 = default_root_dir + "/checkpoints_UQ/"
+UQ_Model_path = default_root_dir + "/checkpoints/"
+# UQ model optimization hyperparameters
+lr_UQ = 5e-4
+weight_decay_UQ = 1e-4
+beta_1_UQ = 0.9
+beta_2_UQ = 0.95
+T_max_UQ = 10
 
 const_vars = [
     "land_sea_mask",
@@ -125,7 +154,7 @@ dict_root_dirs = {
     "train": {
         # "era5":"/mnt/data/era5/1979/",
         # "era5":"/mnt/data/era5_second/1980/",
-        "era5":"/nfs/weather/era5/1979",
+        "era5": f"/nfs/weather/era5/{year}",
         # "era5":"/nfs/weather/era5/1980",
         # "era5":"/blob/weathers2/xuerui/Dual-Weather/data/era5/1979",
     },
@@ -141,7 +170,7 @@ dict_root_dirs = {
 dict_metadata_dirs = {
     # "era5":"/mnt/data/era5/1979/",
     # "era5":"/mnt/data/era5_second/1980/",
-    "era5":"/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/data/era5_data_utils/era5_1979",
+    "era5": default_root_dir + f"/data/era5_data_utils/era5_{year}",
     # "era5":"/blob/weathers2/xuerui/Dual-Weather/project/DEL-Weather/data/era5_data_utils/era5_1980",
     # "era5":"/blob/weathers2/xuerui/Dual-Weather/data/era5_second/1980/",
 }
@@ -348,12 +377,13 @@ dict_hrs_each_step = {
     "era5": 1,  
 }
 dict_max_predict_range = {
-    "era5": 384,
+    "era5": 1,
 }
 batch_size = 2
-shuffle_buffer_size = 10000
+shuffle_buffer_size = 10
 val_shuffle_buffer_size = 10
-num_workers = 4
+# 这里调成大于0的数总是会报设备内存不够的错误
+num_workers = 0
 pin_memory = True
 use_old_loader = False
 

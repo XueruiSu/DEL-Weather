@@ -15,7 +15,7 @@ from torchdata.dataloader2 import (
 
 from torchdata.dataloader2 import MultiProcessingReadingService as MPRS
 from data.seqrecord_utils.wseqrecord import WSeqRecord
-from data.seqrecord.era5_dp import build_wdatapipe
+from data.seqrecord.era5_dp import build_wdatapipe, build_wdatapipe_UQ
 
 
 def get_normalization_transforms(
@@ -194,3 +194,139 @@ class MultiSourceDataModule(LightningDataModule):
             return self._build_dataloader(self.test_datapipe)
         else:
             return None
+
+
+class MultiSourceDataModule_UQ(LightningDataModule):
+    def __init__(
+        self,
+        Main_Model_1: torch.nn.modules, 
+        Main_Model_2: torch.nn.modules, 
+        dict_root_dirs: dict,
+        dict_data_spatial_shapes: dict,
+        dict_single_vars: dict,
+        dict_atmos_vars: dict,
+        dict_hrs_each_step: dict,
+        dict_max_predict_range: dict,
+        batch_size: int,
+        dict_metadata_dirs: Optional[dict] = None,
+        prefetch: int = 0,
+        shuffle_buffer_size: int = int(1e6),
+        val_shuffle_buffer_size: int = int(1e6),
+        num_workers: int = 0,
+        pin_memory: bool = False,
+        use_old_loader: bool = False,
+    ):
+        super().__init__()
+        self.save_hyperparameters()
+        self.dict_root_dirs = dict_root_dirs
+        self.dict_metadata_dirs = dict_metadata_dirs
+        self.dict_data_spatial_shapes = dict_data_spatial_shapes
+        self.dict_single_vars = dict_single_vars
+        self.dict_atmos_vars = dict_atmos_vars
+        self.dict_hrs_each_step = dict_hrs_each_step
+        self.dict_max_predict_range = dict_max_predict_range
+        self.use_old_loader = use_old_loader
+        self.train_datapipe, self.val_datapipe, self.test_datapipe = None, None, None
+        self.Main_Model_1, self.Main_Model_2 = Main_Model_1, Main_Model_2
+
+    def _build_datapipe(self, dict_root_dirs: dict[str, str], file_shuffle_buffer_size=None):
+        records = []
+        for k in dict_root_dirs.keys():
+            root_dir = dict_root_dirs[k]
+            self.dict_data_spatial_shapes[k]
+            single_vars = self.dict_single_vars[k]
+            atmos_vars = self.dict_atmos_vars[k]
+            hrs_each_step = self.dict_hrs_each_step[k]
+            max_predict_range = self.dict_max_predict_range[k]
+            # TODO: does it make sense to have separate normalization for each dataset? Or should we compute something across oour datasets for each variable?
+            if self.dict_metadata_dirs is not None:
+                metadata_dir = self.dict_metadata_dirs[k]
+                single_transforms, atmos_transforms = get_normalization_transforms(
+                    metadata_dir, single_vars, atmos_vars
+                )
+                lat = np.load(os.path.join(metadata_dir, "lat.npy"))
+                lon = np.load(os.path.join(metadata_dir, "lon.npy"))
+                if lat.shape[0] == 721:
+                    lat = lat[:-1]
+            else:
+                single_transforms, atmos_transforms = None, None
+                lat, lon = None, None
+            # todo: [SHC] add transform and combination of atoms and single vars
+            record: WSeqRecord = WSeqRecord.load_record(recorddir=root_dir)
+            record.set_framereader_args(
+                {
+                    "input_features": single_vars + atmos_vars,
+                    "target_features": single_vars + atmos_vars,
+                    "max_pred_steps": max_predict_range,
+                }
+            )
+            records.append(record)
+
+        assert len(records) == 1  # For now, we only support one data set.
+        return build_wdatapipe_UQ(self.Main_Model_1, self.Main_Model_1,
+            records[0],
+            file_shuffle_buffer_size,
+            single_vars=single_vars,
+            atmos_vars=atmos_vars,
+            lat=lat,
+            lon=lon,
+            hrs_each_step=hrs_each_step,
+            batch_size=self.hparams.batch_size,
+            single_transforms=single_transforms,
+            atmos_transforms=atmos_transforms,
+            prefetch=self.hparams.prefetch,
+            mappings=[],
+        )
+
+    def setup(self, stage: Optional[str] = None):
+        assert ("train" in self.dict_root_dirs and "val" in self.dict_root_dirs) or (
+            "test" in self.dict_root_dirs
+        ), "The data dirs of either train&val or test must be set."
+        if "train" in self.dict_root_dirs:
+            self.train_datapipe = self._build_datapipe(
+                self.dict_root_dirs["train"], self.hparams.shuffle_buffer_size
+            )
+            self.val_datapipe = self._build_datapipe(
+                self.dict_root_dirs["val"], self.hparams.val_shuffle_buffer_size
+            )
+        if "test" in self.dict_root_dirs:
+            self.test_datapipe = self._build_datapipe(self.dict_root_dirs["test"])
+
+    def _build_dataloader(self, datapipe):
+        if self.use_old_loader:
+            # Batch size and collate_fn are already set in the datapipe.
+            return torch.utils.data.DataLoader(
+                datapipe,
+                num_workers=self.hparams.num_workers,
+                pin_memory=self.hparams.pin_memory,
+                batch_size=None,
+                collate_fn=None,
+            )
+
+        # Recommended way to combine multiprocessing + distributed sharding
+        # https://pytorch.org/data/main/dlv2_tutorial.html#multiprocessing-distributed
+        rs = MPRS(num_workers=self.hparams.num_workers)
+        if torch.distributed.is_initialized():
+            dist_rs = DistributedReadingService()
+            rs = SequentialReadingService(dist_rs, rs)
+        return DataLoader2(datapipe, reading_service=rs)
+
+    def train_dataloader(self):
+        if self.train_datapipe is not None:
+            return self._build_dataloader(self.train_datapipe)
+        else:
+            return None
+
+    def val_dataloader(self):
+        if self.val_datapipe is not None:
+            return self._build_dataloader(self.val_datapipe)
+        else:
+            return None
+
+    def test_dataloader(self):
+        if self.test_datapipe is not None:
+            return self._build_dataloader(self.test_datapipe)
+        else:
+            return None
+
+

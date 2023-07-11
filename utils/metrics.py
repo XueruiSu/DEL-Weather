@@ -40,6 +40,56 @@ def lat_weighted_mse(
     return loss_dict
 
 
+def lat_weighted_mse_UQ(
+    single_targets: torch.Tensor, atmos_targets: torch.Tensor, 
+    single_preds_1: torch.Tensor, atmos_preds_1: torch.Tensor, 
+    single_preds_2: torch.Tensor, atmos_preds_2: torch.Tensor, 
+    metadata, R2Loss_pre: torch.Tensor,
+):  
+    '''
+    single_targets: torch.Tensor (B, len(single_vars), H, W), 
+    atmos_targets: torch.Tensor (B, len(atmos_levels), len(atmos_vars), H, W), 
+    single_preds_1: torch.Tensor (B, len(single_vars), H, W), 
+    atmos_preds_1: torch.Tensor (B, len(atmos_levels), len(atmos_vars), H, W), 
+    single_preds_2: torch.Tensor (B, len(single_vars), H, W), 
+    atmos_preds_2: torch.Tensor (B, len(atmos_levels), len(atmos_vars), H, W), 
+    metadata: Metadata class,
+    R2Loss_pre: torch.Tensor (B, len(single_vars)+len(atmos_levels)*len(atmos_vars)),
+    '''
+    # preparation:
+    lat = metadata.lat.to(single_targets.device)
+    w_lat = torch.cos(torch.deg2rad(lat))
+    w_lat = w_lat / w_lat.mean()  # (H, )
+    w_lat = w_lat.unsqueeze(0).unsqueeze(-1)
+    num_single_vars = len(metadata.single_vars)
+    R2Loss_pre_single_vars = R2Loss_pre[:, :num_single_vars]
+    R2Loss_pre_atmos_vars = R2Loss_pre[:, num_single_vars:].reshape(R2Loss_pre.shape[0], -1, len(metadata.atmos_vars))
+    
+    # residual calculation:
+    single_residual = ((single_preds_1 - single_targets) ** 2 - (single_preds_2 - single_targets) ** 2)  # (B, len(single_vars), H, W)
+    atmos_residual = (atmos_preds_1 - atmos_targets) ** 2 - (atmos_preds_2 - atmos_targets) ** 2 # (B, len(atmos_levels), len(atmos_vars), H, W)
+    w_single_residual = (single_residual * w_lat.unsqueeze(1)).mean(dim=(-2, -1)) # (B, len(single_vars))
+    w_atmos_residual = (atmos_residual * w_lat.unsqueeze(1)).mean(dim=(-2, -1)) # (B, len(atmos_levels), len(atmos_vars))
+    
+    # Loss calculation:
+    loss_dict = {}
+    w_single_error = (w_single_residual - R2Loss_pre_single_vars) ** 2
+    w_atmos_error = (w_atmos_residual - R2Loss_pre_atmos_vars) ** 2
+    loss_dict["loss"] = (w_single_error.mean() + w_atmos_error.mean())
+    with torch.no_grad():
+        avg_w_single_error = w_single_error.mean(dim=(0))
+        for i, var in enumerate(metadata.single_vars):
+            loss_dict[var] = avg_w_single_error[i]
+
+        for i, var in enumerate(metadata.atmos_vars):
+            avg_w_atmos_error = w_atmos_error[:, :, i].mean(dim=(0)) # (len(atmos_levels), )
+            # TODO confirm order of vars and levels
+            for l, level in enumerate(metadata.atmos_vars[var]):
+                loss_dict[f"{var}_{level}"] = avg_w_atmos_error[l]
+
+    return loss_dict
+
+
 class LatWeightedMSE(torch.nn.Module):
     def __init__(self, lat):
         super().__init__()

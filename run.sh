@@ -1,2 +1,4 @@
+# %env JOBLIB_TEMP_FOLDER=/tmp
+# export TMPDIR=.
 export PYTHONPATH=.:$PYTHONPATH                                                     
-PATHONPATH=. python models/framework/Climai_train.py 
+PYTHONPATH=. python models/framework/Climai_train.py 

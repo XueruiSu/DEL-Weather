@@ -75,7 +75,9 @@ def test_climnet_forward(grid_size):
     print("lead_times", lead_times.shape)
     print("metadata lat", metadata.lat.shape)
     print("metadata lon", metadata.lon.shape)
-    
+    print(loss_dict[0])
+    for k, v in loss_dict[0].items():
+        print(k, v)
     assert len(loss_dict) == 1
     
     
